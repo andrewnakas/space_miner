@@ -298,6 +298,33 @@
             color: #0ff;
             font-weight: bold;
         }
+
+        #minimap {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 150px;
+            height: 400px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            padding: 10px;
+        }
+
+        #minimap h3 {
+            color: #0ff;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        #minimapCanvas {
+            width: 100%;
+            height: calc(100% - 30px);
+            border: 1px solid #0f0;
+            background: #000;
+        }
     </style>
 </head>
 <body>
@@ -344,6 +371,11 @@
                 <div>SPACE - Mine</div>
                 <div>E - Shop (at Earth)</div>
             </div>
+        </div>
+
+        <div id="minimap">
+            <h3>📡 MAP</h3>
+            <canvas id="minimapCanvas" width="130" height="350"></canvas>
         </div>
 
         <div id="shop">
@@ -461,6 +493,8 @@
         // Game configuration and state
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimapCanvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
 
         const game = {
             // Player rocket state
@@ -821,13 +855,26 @@
             p.atEarth = distToEarth < 60;
 
             // Landing mechanics
-            if (p.atEarth && Math.abs(p.vy) > game.settings.landingSpeed) {
-                // Crash landing!
+            if (p.atEarth && p.vy > game.settings.landingSpeed) {
+                // Crash landing! (only when falling down)
                 p.hull -= 10;
                 showMessage('⚠️ HARD LANDING! Hull damaged!', '#f00');
-            } else if (p.atEarth && p.vy > 0) {
-                // Soft landing - refuel
-                p.fuel = Math.min(p.maxFuel, p.fuel + 0.5);
+                p.vy *= 0.5;
+            } else if (p.atEarth && p.vy > 0 && p.vy <= game.settings.landingSpeed) {
+                // Soft landing - refuel for a cost
+                const fuelNeeded = p.maxFuel - p.fuel;
+                const fuelCost = Math.ceil(fuelNeeded * 0.5); // $0.50 per fuel unit
+
+                if (fuelNeeded > 1 && p.money >= fuelCost) {
+                    p.fuel = p.maxFuel;
+                    p.money -= fuelCost;
+                } else if (fuelNeeded > 1 && p.money < fuelCost) {
+                    // Partial refuel with available money
+                    const canAfford = Math.floor(p.money / 0.5);
+                    p.fuel = Math.min(p.maxFuel, p.fuel + canAfford);
+                    p.money = Math.max(0, p.money - Math.ceil(canAfford * 0.5));
+                }
+
                 p.vy *= 0.9;
                 p.y = game.world.earthY;
             }
@@ -928,7 +975,9 @@
 
         // Respawn rocket after destruction
         function respawnRocket() {
-            showMessage('💥 ROCKET DESTROYED! Building new one...', '#f00');
+            const rebuildCost = 500 + (game.upgrades.hull * 200) + (game.upgrades.fuel * 100) + (game.upgrades.engine * 150);
+
+            showMessage(`💥 ROCKET DESTROYED! Rebuild cost: $${rebuildCost}`, '#f00');
 
             game.player.x = canvas.width / 2;
             game.player.y = game.world.earthY;
@@ -939,8 +988,8 @@
             game.player.cargo = 0;
             game.player.atEarth = true;
 
-            // Penalty: lose some money
-            game.player.money = Math.floor(game.player.money * 0.7);
+            // Penalty: rebuild cost
+            game.player.money = Math.max(0, game.player.money - rebuildCost);
         }
 
         // Update UI elements
@@ -1193,10 +1242,114 @@
             ctx.restore();
         }
 
+        // Render minimap
+        function renderMinimap() {
+            const mmCtx = minimapCtx;
+            const mmWidth = minimapCanvas.width;
+            const mmHeight = minimapCanvas.height;
+
+            // Clear minimap
+            mmCtx.fillStyle = '#000';
+            mmCtx.fillRect(0, 0, mmWidth, mmHeight);
+
+            // Calculate scale (show a range of about 60km altitude)
+            const viewRange = 60000; // 60km in game units
+            const scale = mmHeight / viewRange;
+
+            // Player position in game world
+            const p = game.player;
+            const playerAltitude = game.world.earthY - p.y;
+
+            // Draw Earth at bottom
+            const earthY = mmHeight - 10;
+            mmCtx.fillStyle = '#4488ff';
+            mmCtx.beginPath();
+            mmCtx.arc(mmWidth / 2, earthY, 8, 0, Math.PI * 2);
+            mmCtx.fill();
+
+            // Label Earth
+            mmCtx.fillStyle = '#0f0';
+            mmCtx.font = '10px monospace';
+            mmCtx.textAlign = 'center';
+            mmCtx.fillText('EARTH', mmWidth / 2, earthY + 20);
+
+            // Draw player rocket
+            const playerY = earthY - (playerAltitude * scale);
+
+            // Only draw if in view
+            if (playerY >= -10 && playerY <= mmHeight + 10) {
+                mmCtx.fillStyle = '#ff0';
+                mmCtx.beginPath();
+                mmCtx.moveTo(mmWidth / 2, playerY - 6);
+                mmCtx.lineTo(mmWidth / 2 - 4, playerY + 6);
+                mmCtx.lineTo(mmWidth / 2 + 4, playerY + 6);
+                mmCtx.closePath();
+                mmCtx.fill();
+
+                // Player arrow/indicator
+                mmCtx.strokeStyle = '#ff0';
+                mmCtx.lineWidth = 2;
+                mmCtx.stroke();
+            }
+
+            // Draw fuel depots
+            if (game.research.fuelDepot) {
+                for (const depot of game.fuelDepots) {
+                    const depotAltitude = game.world.earthY - depot.y;
+                    const depotY = earthY - (depotAltitude * scale);
+
+                    if (depotY >= 0 && depotY <= mmHeight) {
+                        mmCtx.fillStyle = '#fa0';
+                        mmCtx.fillRect(mmWidth / 2 - 3, depotY - 2, 6, 4);
+                    }
+                }
+            }
+
+            // Draw wormholes
+            for (const wormhole of game.wormholes) {
+                const wormholeAltitude = game.world.earthY - wormhole.y;
+                const wormholeY = earthY - (wormholeAltitude * scale);
+
+                if (wormholeY >= 0 && wormholeY <= mmHeight) {
+                    mmCtx.strokeStyle = '#a0f';
+                    mmCtx.lineWidth = 2;
+                    mmCtx.beginPath();
+                    mmCtx.arc(mmWidth / 2, wormholeY, 5, 0, Math.PI * 2);
+                    mmCtx.stroke();
+                }
+            }
+
+            // Draw altitude markers
+            mmCtx.strokeStyle = '#0f0';
+            mmCtx.lineWidth = 1;
+            mmCtx.font = '8px monospace';
+            mmCtx.textAlign = 'right';
+
+            for (let alt = 10000; alt <= 60000; alt += 10000) {
+                const markerY = earthY - (alt * scale);
+                if (markerY >= 0 && markerY <= mmHeight) {
+                    mmCtx.fillStyle = '#0f0';
+                    mmCtx.fillText(`${alt/1000}km`, mmWidth - 5, markerY + 3);
+
+                    mmCtx.strokeStyle = '#0f0';
+                    mmCtx.beginPath();
+                    mmCtx.moveTo(mmWidth / 2 - 15, markerY);
+                    mmCtx.lineTo(mmWidth / 2 + 15, markerY);
+                    mmCtx.stroke();
+                }
+            }
+
+            // Draw border
+            mmCtx.strokeStyle = '#0f0';
+            mmCtx.lineWidth = 1;
+            mmCtx.strokeRect(0, 0, mmWidth, mmHeight);
+        }
+
         // Main game loop
         function gameLoop() {
             update();
             render();
+            renderMinimap();
             requestAnimationFrame(gameLoop);
         }
 

@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Miner - Cosmic Resource Expedition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 1200px;
+            height: 800px;
+            border: 2px solid #0f0;
+            box-shadow: 0 0 20px #0f0;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #000;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+            min-width: 250px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        #ui h2 {
+            color: #0ff;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        #ui .stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        #ui .stat-label {
+            color: #0f0;
+        }
+
+        #ui .stat-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .bar {
+            width: 100%;
+            height: 15px;
+            background: #333;
+            border: 1px solid #0f0;
+            margin: 5px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .fuel-bar { background: linear-gradient(90deg, #ff0000, #ffff00); }
+        .hull-bar { background: linear-gradient(90deg, #00ff00, #00ffff); }
+        .cargo-bar { background: linear-gradient(90deg, #ff00ff, #ffff00); }
+
+        #shop {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 30px;
+            border: 3px solid #0ff;
+            border-radius: 10px;
+            display: none;
+            max-width: 800px;
+            max-height: 700px;
+            overflow-y: auto;
+            box-shadow: 0 0 30px #0ff;
+        }
+
+        #shop.active {
+            display: block;
+        }
+
+        #shop h2 {
+            color: #0ff;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 15px #0ff;
+        }
+
+        .shop-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 2px solid #0f0;
+            border-radius: 5px;
+        }
+
+        .shop-section h3 {
+            color: #ff0;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .shop-item {
+            background: rgba(0, 255, 0, 0.1);
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #0f0;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .shop-item:hover {
+            background: rgba(0, 255, 0, 0.2);
+            border-color: #0ff;
+            transform: translateX(5px);
+        }
+
+        .shop-item.locked {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .shop-item.locked:hover {
+            transform: none;
+        }
+
+        .shop-item-header {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .shop-item-name {
+            color: #0ff;
+        }
+
+        .shop-item-cost {
+            color: #ff0;
+        }
+
+        .shop-item-desc {
+            color: #aaa;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+
+        .shop-item-level {
+            color: #0f0;
+            font-size: 12px;
+        }
+
+        #closeShop {
+            background: #f00;
+            color: #fff;
+            border: 2px solid #fff;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+
+        #closeShop:hover {
+            background: #ff3333;
+        }
+
+        #messages {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border: 2px solid #ff0;
+            border-radius: 5px;
+            display: none;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            max-width: 80%;
+        }
+
+        #messages.show {
+            display: block;
+            animation: fadeInOut 3s;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
+        }
+
+        .warning {
+            color: #ff0;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.5; }
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #startScreen h1 {
+            font-size: 48px;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff;
+            margin-bottom: 20px;
+        }
+
+        #startScreen p {
+            font-size: 16px;
+            color: #0f0;
+            margin: 10px 0;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        #startButton {
+            background: #0f0;
+            color: #000;
+            border: 3px solid #0ff;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 30px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 0 20px #0f0;
+            transition: all 0.3s;
+        }
+
+        #startButton:hover {
+            background: #0ff;
+            box-shadow: 0 0 30px #0ff;
+            transform: scale(1.1);
+        }
+
+        .controls {
+            margin-top: 20px;
+            color: #0f0;
+            font-size: 14px;
+        }
+
+        .controls span {
+            color: #0ff;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+
+        <div id="ui">
+            <h2>⚡ ROCKET STATUS</h2>
+            <div class="stat">
+                <span class="stat-label">Money:</span>
+                <span class="stat-value" id="money">$0</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Altitude:</span>
+                <span class="stat-value" id="altitude">0 km</span>
+            </div>
+            <div class="bar">
+                <div class="bar-fill fuel-bar" id="fuelBar" style="width: 100%;"></div>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Fuel:</span>
+                <span class="stat-value" id="fuel">100%</span>
+            </div>
+            <div class="bar">
+                <div class="bar-fill hull-bar" id="hullBar" style="width: 100%;"></div>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Hull:</span>
+                <span class="stat-value" id="hull">100%</span>
+            </div>
+            <div class="bar">
+                <div class="bar-fill cargo-bar" id="cargoBar" style="width: 0%;"></div>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Cargo:</span>
+                <span class="stat-value" id="cargo">0/100</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Galaxy:</span>
+                <span class="stat-value" id="galaxy">Milky Way</span>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #0f0; font-size: 12px; color: #0ff;">
+                <div>WASD - Move</div>
+                <div>SPACE - Mine</div>
+                <div>E - Shop (at Earth)</div>
+            </div>
+        </div>
+
+        <div id="shop">
+            <h2>🚀 EARTH BASE - SHOP & RESEARCH</h2>
+
+            <div class="shop-section">
+                <h3>💰 SELL CARGO</h3>
+                <div class="shop-item" id="sellCargo">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Sell All Cargo</span>
+                        <span class="shop-item-cost">Value: $<span id="cargoValue">0</span></span>
+                    </div>
+                    <div class="shop-item-desc">Convert collected resources into money</div>
+                </div>
+            </div>
+
+            <div class="shop-section">
+                <h3>⚙️ UPGRADES</h3>
+                <div class="shop-item" id="upgradeFuel">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Fuel Tank</span>
+                        <span class="shop-item-cost">$<span id="fuelCost">500</span></span>
+                    </div>
+                    <div class="shop-item-desc">Increase fuel capacity by 50 units</div>
+                    <div class="shop-item-level">Level: <span id="fuelLevel">1</span></div>
+                </div>
+                <div class="shop-item" id="upgradeCargo">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Cargo Bay</span>
+                        <span class="shop-item-cost">$<span id="cargoCost">400</span></span>
+                    </div>
+                    <div class="shop-item-desc">Increase cargo capacity by 50 units</div>
+                    <div class="shop-item-level">Level: <span id="cargoLevel">1</span></div>
+                </div>
+                <div class="shop-item" id="upgradeHull">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Hull Armor</span>
+                        <span class="shop-item-cost">$<span id="hullCost">600</span></span>
+                    </div>
+                    <div class="shop-item-desc">Increase hull strength by 25 points</div>
+                    <div class="shop-item-level">Level: <span id="hullLevel">1</span></div>
+                </div>
+                <div class="shop-item" id="upgradeEngine">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Engine Thrust</span>
+                        <span class="shop-item-cost">$<span id="engineCost">800</span></span>
+                    </div>
+                    <div class="shop-item-desc">Increase acceleration and speed</div>
+                    <div class="shop-item-level">Level: <span id="engineLevel">1</span></div>
+                </div>
+                <div class="shop-item" id="upgradeMining">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Mining Laser</span>
+                        <span class="shop-item-cost">$<span id="miningCost">700</span></span>
+                    </div>
+                    <div class="shop-item-desc">Mine resources faster</div>
+                    <div class="shop-item-level">Level: <span id="miningLevel">1</span></div>
+                </div>
+            </div>
+
+            <div class="shop-section">
+                <h3>🔬 RESEARCH</h3>
+                <div class="shop-item locked" id="researchFuelDepot">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Fuel Depot Satellite</span>
+                        <span class="shop-item-cost">$5000</span>
+                    </div>
+                    <div class="shop-item-desc">Deploy orbital fuel stations. Refuel anywhere!</div>
+                    <div class="shop-item-level">Status: <span id="fuelDepotStatus">Locked</span></div>
+                </div>
+                <div class="shop-item locked" id="researchScanner">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Resource Scanner</span>
+                        <span class="shop-item-cost">$3000</span>
+                    </div>
+                    <div class="shop-item-desc">Highlight valuable asteroids and resources</div>
+                    <div class="shop-item-level">Status: <span id="scannerStatus">Locked</span></div>
+                </div>
+                <div class="shop-item locked" id="researchWormhole">
+                    <div class="shop-item-header">
+                        <span class="shop-item-name">Wormhole Generator</span>
+                        <span class="shop-item-cost">$50000</span>
+                    </div>
+                    <div class="shop-item-desc">Travel to distant galaxies with rare resources!</div>
+                    <div class="shop-item-level">Status: <span id="wormholeStatus">Locked</span></div>
+                </div>
+            </div>
+
+            <button id="closeShop">LAUNCH ROCKET [E]</button>
+        </div>
+
+        <div id="messages"></div>
+
+        <div id="startScreen">
+            <h1>🚀 SPACE MINER 🚀</h1>
+            <p>
+                Welcome, Commander! Your mission: explore space, mine asteroids and planets,
+                and return to Earth with valuable resources.
+            </p>
+            <p>
+                ⚠️ WARNING: You must have enough fuel to return and land safely, or your rocket will be destroyed!
+            </p>
+            <p>
+                Upgrade your rocket, research new technologies, deploy fuel depots,
+                and eventually unlock wormhole travel to reach distant galaxies!
+            </p>
+            <p class="controls">
+                <span>WASD</span> to move • <span>SPACE</span> to mine • <span>E</span> to open shop at Earth
+            </p>
+            <button id="startButton">START MISSION</button>
+        </div>
+    </div>
+
+    <script>
+        // Game configuration and state
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const game = {
+            // Player rocket state
+            player: {
+                x: canvas.width / 2,
+                y: canvas.height - 100,
+                vx: 0,
+                vy: 0,
+                width: 20,
+                height: 30,
+                fuel: 100,
+                maxFuel: 100,
+                hull: 100,
+                maxHull: 100,
+                cargo: 0,
+                maxCargo: 100,
+                thrust: 0.15,
+                mining: false,
+                miningPower: 1,
+                money: 0,
+                atEarth: true
+            },
+
+            // World state
+            world: {
+                scroll: 0,
+                targetScroll: 0,
+                earthY: canvas.height - 100,
+                currentGalaxy: 'Milky Way',
+                galaxyIndex: 0
+            },
+
+            // Celestial objects
+            asteroids: [],
+            planets: [],
+            fuelDepots: [],
+            wormholes: [],
+
+            // Upgrades and research
+            upgrades: {
+                fuel: 1,
+                cargo: 1,
+                hull: 1,
+                engine: 1,
+                mining: 1
+            },
+
+            research: {
+                fuelDepot: false,
+                scanner: false,
+                wormhole: false
+            },
+
+            // Game settings
+            settings: {
+                gravity: 0.02,
+                fuelConsumption: 0.05,
+                miningRange: 40,
+                landingSpeed: 2
+            },
+
+            // Input state
+            keys: {},
+            shopOpen: false,
+            gameStarted: false
+        };
+
+        // Galaxy definitions
+        const galaxies = [
+            { name: 'Milky Way', color: '#4488ff', resourceMultiplier: 1 },
+            { name: 'Andromeda', color: '#ff44ff', resourceMultiplier: 2 },
+            { name: 'Triangulum', color: '#44ff88', resourceMultiplier: 3 },
+            { name: 'Centaurus A', color: '#ffaa44', resourceMultiplier: 5 },
+            { name: 'Whirlpool', color: '#ff4444', resourceMultiplier: 10 }
+        ];
+
+        // Initialize the game
+        function init() {
+            generateSpace();
+            setupEventListeners();
+            gameLoop();
+        }
+
+        // Generate asteroids and planets
+        function generateSpace() {
+            game.asteroids = [];
+            game.planets = [];
+
+            const currentGalaxy = galaxies[game.world.galaxyIndex];
+            const multiplier = currentGalaxy.resourceMultiplier;
+
+            // Generate asteroids at various altitudes
+            for (let i = 0; i < 150; i++) {
+                const altitude = Math.random() * 50000 + 500;
+                game.asteroids.push({
+                    x: Math.random() * canvas.width,
+                    y: canvas.height - 100 - altitude,
+                    size: Math.random() * 30 + 10,
+                    type: Math.random() < 0.3 ? 'rare' : 'common',
+                    health: Math.random() * 100 + 50,
+                    maxHealth: Math.random() * 100 + 50,
+                    value: Math.floor((Math.random() * 50 + 10) * multiplier),
+                    rotation: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Generate planets
+            for (let i = 0; i < 10; i++) {
+                const altitude = Math.random() * 45000 + 2000;
+                game.planets.push({
+                    x: Math.random() * canvas.width,
+                    y: canvas.height - 100 - altitude,
+                    size: Math.random() * 80 + 60,
+                    type: ['rocky', 'gas', 'ice'][Math.floor(Math.random() * 3)],
+                    health: Math.random() * 500 + 300,
+                    maxHealth: Math.random() * 500 + 300,
+                    value: Math.floor((Math.random() * 200 + 100) * multiplier),
+                    hue: Math.random() * 360
+                });
+            }
+
+            // Create wormhole at high altitude if researched
+            if (game.research.wormhole && game.world.galaxyIndex < galaxies.length - 1) {
+                game.wormholes = [{
+                    x: canvas.width / 2,
+                    y: canvas.height - 100 - 55000,
+                    size: 80,
+                    active: true
+                }];
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                game.keys[e.key.toLowerCase()] = true;
+
+                if (e.key.toLowerCase() === 'e' && game.player.atEarth) {
+                    toggleShop();
+                }
+
+                if (e.key === ' ') {
+                    e.preventDefault();
+                    game.player.mining = true;
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                game.keys[e.key.toLowerCase()] = false;
+
+                if (e.key === ' ') {
+                    game.player.mining = false;
+                }
+            });
+
+            // Shop buttons
+            document.getElementById('startButton').addEventListener('click', startGame);
+            document.getElementById('closeShop').addEventListener('click', toggleShop);
+            document.getElementById('sellCargo').addEventListener('click', sellCargo);
+            document.getElementById('upgradeFuel').addEventListener('click', () => buyUpgrade('fuel', 500));
+            document.getElementById('upgradeCargo').addEventListener('click', () => buyUpgrade('cargo', 400));
+            document.getElementById('upgradeHull').addEventListener('click', () => buyUpgrade('hull', 600));
+            document.getElementById('upgradeEngine').addEventListener('click', () => buyUpgrade('engine', 800));
+            document.getElementById('upgradeMining').addEventListener('click', () => buyUpgrade('mining', 700));
+            document.getElementById('researchFuelDepot').addEventListener('click', () => buyResearch('fuelDepot', 5000));
+            document.getElementById('researchScanner').addEventListener('click', () => buyResearch('scanner', 3000));
+            document.getElementById('researchWormhole').addEventListener('click', () => buyResearch('wormhole', 50000));
+        }
+
+        // Start the game
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            game.gameStarted = true;
+        }
+
+        // Toggle shop
+        function toggleShop() {
+            if (!game.player.atEarth && !game.shopOpen) {
+                showMessage('Return to Earth to access the shop!', '#ff0');
+                return;
+            }
+
+            game.shopOpen = !game.shopOpen;
+            document.getElementById('shop').classList.toggle('active');
+            updateShopUI();
+        }
+
+        // Sell cargo
+        function sellCargo() {
+            if (game.player.cargo > 0) {
+                const value = Math.floor(game.player.cargo * 10);
+                game.player.money += value;
+                showMessage(`Sold cargo for $${value}!`, '#0f0');
+                game.player.cargo = 0;
+                updateShopUI();
+            }
+        }
+
+        // Buy upgrade
+        function buyUpgrade(type, baseCost) {
+            const level = game.upgrades[type];
+            const cost = baseCost * level;
+
+            if (game.player.money >= cost) {
+                game.player.money -= cost;
+                game.upgrades[type]++;
+
+                // Apply upgrade
+                switch(type) {
+                    case 'fuel':
+                        game.player.maxFuel += 50;
+                        game.player.fuel = game.player.maxFuel;
+                        break;
+                    case 'cargo':
+                        game.player.maxCargo += 50;
+                        break;
+                    case 'hull':
+                        game.player.maxHull += 25;
+                        game.player.hull = game.player.maxHull;
+                        break;
+                    case 'engine':
+                        game.player.thrust += 0.03;
+                        break;
+                    case 'mining':
+                        game.player.miningPower += 0.5;
+                        break;
+                }
+
+                showMessage(`Upgraded ${type}!`, '#0f0');
+                updateShopUI();
+            } else {
+                showMessage('Not enough money!', '#f00');
+            }
+        }
+
+        // Buy research
+        function buyResearch(type, cost) {
+            if (game.research[type]) {
+                showMessage('Already researched!', '#ff0');
+                return;
+            }
+
+            if (game.player.money >= cost) {
+                game.player.money -= cost;
+                game.research[type] = true;
+
+                // Deploy fuel depots
+                if (type === 'fuelDepot') {
+                    for (let i = 0; i < 5; i++) {
+                        const altitude = (i + 1) * 10000;
+                        game.fuelDepots.push({
+                            x: Math.random() * canvas.width,
+                            y: canvas.height - 100 - altitude,
+                            size: 30,
+                            active: true
+                        });
+                    }
+                }
+
+                // Regenerate space for wormholes
+                if (type === 'wormhole') {
+                    generateSpace();
+                }
+
+                showMessage(`Researched ${type}!`, '#0ff');
+                updateShopUI();
+            } else {
+                showMessage('Not enough money!', '#f00');
+            }
+        }
+
+        // Update shop UI
+        function updateShopUI() {
+            document.getElementById('money').textContent = '$' + game.player.money;
+            document.getElementById('cargoValue').textContent = Math.floor(game.player.cargo * 10);
+
+            // Update upgrade costs and levels
+            document.getElementById('fuelCost').textContent = 500 * game.upgrades.fuel;
+            document.getElementById('fuelLevel').textContent = game.upgrades.fuel;
+            document.getElementById('cargoCost').textContent = 400 * game.upgrades.cargo;
+            document.getElementById('cargoLevel').textContent = game.upgrades.cargo;
+            document.getElementById('hullCost').textContent = 600 * game.upgrades.hull;
+            document.getElementById('hullLevel').textContent = game.upgrades.hull;
+            document.getElementById('engineCost').textContent = 800 * game.upgrades.engine;
+            document.getElementById('engineLevel').textContent = game.upgrades.engine;
+            document.getElementById('miningCost').textContent = 700 * game.upgrades.mining;
+            document.getElementById('miningLevel').textContent = game.upgrades.mining;
+
+            // Update research status
+            document.getElementById('fuelDepotStatus').textContent = game.research.fuelDepot ? 'Unlocked ✓' : 'Locked';
+            document.getElementById('scannerStatus').textContent = game.research.scanner ? 'Unlocked ✓' : 'Locked';
+            document.getElementById('wormholeStatus').textContent = game.research.wormhole ? 'Unlocked ✓' : 'Locked';
+
+            document.getElementById('researchFuelDepot').classList.toggle('locked', game.research.fuelDepot);
+            document.getElementById('researchScanner').classList.toggle('locked', game.research.scanner);
+            document.getElementById('researchWormhole').classList.toggle('locked', game.research.wormhole);
+        }
+
+        // Show message
+        function showMessage(text, color = '#0f0') {
+            const msgEl = document.getElementById('messages');
+            msgEl.textContent = text;
+            msgEl.style.color = color;
+            msgEl.classList.remove('show');
+            void msgEl.offsetWidth; // Trigger reflow
+            msgEl.classList.add('show');
+        }
+
+        // Update game logic
+        function update() {
+            if (!game.gameStarted || game.shopOpen) return;
+
+            const p = game.player;
+
+            // Apply thrust based on input
+            if (game.keys['w'] && p.fuel > 0) {
+                p.vy -= p.thrust;
+                p.fuel -= game.settings.fuelConsumption;
+            }
+            if (game.keys['s']) {
+                p.vy += p.thrust * 0.5;
+            }
+            if (game.keys['a'] && p.fuel > 0) {
+                p.vx -= p.thrust * 0.8;
+                p.fuel -= game.settings.fuelConsumption * 0.5;
+            }
+            if (game.keys['d'] && p.fuel > 0) {
+                p.vx += p.thrust * 0.8;
+                p.fuel -= game.settings.fuelConsumption * 0.5;
+            }
+
+            // Apply gravity
+            p.vy += game.settings.gravity;
+
+            // Apply drag
+            p.vx *= 0.98;
+            p.vy *= 0.98;
+
+            // Update position
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // Clamp fuel and cargo
+            p.fuel = Math.max(0, Math.min(p.maxFuel, p.fuel));
+            p.cargo = Math.max(0, Math.min(p.maxCargo, p.cargo));
+
+            // Screen wrapping (horizontal)
+            if (p.x < 0) p.x = canvas.width;
+            if (p.x > canvas.width) p.x = 0;
+
+            // Update camera scroll
+            game.world.targetScroll = -(p.y - canvas.height / 2);
+            game.world.scroll += (game.world.targetScroll - game.world.scroll) * 0.1;
+
+            // Check if at Earth
+            const distToEarth = Math.abs(p.y - game.world.earthY);
+            p.atEarth = distToEarth < 60;
+
+            // Landing mechanics
+            if (p.atEarth && Math.abs(p.vy) > game.settings.landingSpeed) {
+                // Crash landing!
+                p.hull -= 10;
+                showMessage('⚠️ HARD LANDING! Hull damaged!', '#f00');
+            } else if (p.atEarth && p.vy > 0) {
+                // Soft landing - refuel
+                p.fuel = Math.min(p.maxFuel, p.fuel + 0.5);
+                p.vy *= 0.9;
+                p.y = game.world.earthY;
+            }
+
+            // Check fuel depots
+            if (game.research.fuelDepot) {
+                for (const depot of game.fuelDepots) {
+                    const dx = p.x - depot.x;
+                    const dy = p.y - depot.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 50) {
+                        p.fuel = Math.min(p.maxFuel, p.fuel + 1);
+                    }
+                }
+            }
+
+            // Check wormholes
+            for (const wormhole of game.wormholes) {
+                const dx = p.x - wormhole.x;
+                const dy = p.y - wormhole.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < wormhole.size) {
+                    // Travel to next galaxy
+                    game.world.galaxyIndex = (game.world.galaxyIndex + 1) % galaxies.length;
+                    game.world.currentGalaxy = galaxies[game.world.galaxyIndex].name;
+                    showMessage(`Entering ${game.world.currentGalaxy} Galaxy!`, '#ff0');
+
+                    // Reset position and regenerate space
+                    p.y = game.world.earthY - 200;
+                    p.vy = 0;
+                    generateSpace();
+                }
+            }
+
+            // Mining
+            if (p.mining) {
+                // Check asteroids
+                for (let i = game.asteroids.length - 1; i >= 0; i--) {
+                    const ast = game.asteroids[i];
+                    const dx = p.x - ast.x;
+                    const dy = p.y - ast.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < game.settings.miningRange + ast.size) {
+                        ast.health -= p.miningPower;
+
+                        if (ast.health <= 0) {
+                            // Collect resources
+                            const amount = Math.floor(ast.value / 10);
+                            if (p.cargo < p.maxCargo) {
+                                p.cargo += amount;
+                                game.asteroids.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+
+                // Check planets
+                for (let i = game.planets.length - 1; i >= 0; i--) {
+                    const planet = game.planets[i];
+                    const dx = p.x - planet.x;
+                    const dy = p.y - planet.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < game.settings.miningRange + planet.size) {
+                        planet.health -= p.miningPower * 0.5;
+
+                        if (planet.health <= 0) {
+                            const amount = Math.floor(planet.value / 10);
+                            if (p.cargo < p.maxCargo) {
+                                p.cargo += amount;
+                                game.planets.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check for game over (no fuel and can't reach Earth)
+            if (p.fuel <= 0 && !p.atEarth) {
+                const distToEarthY = Math.abs(p.y - game.world.earthY);
+                if (distToEarthY > 100 && p.vy > 1) {
+                    // Out of fuel and falling!
+                    p.hull -= 0.5;
+                }
+            }
+
+            // Hull check
+            if (p.hull <= 0) {
+                respawnRocket();
+            }
+
+            // Update UI
+            updateUI();
+        }
+
+        // Respawn rocket after destruction
+        function respawnRocket() {
+            showMessage('💥 ROCKET DESTROYED! Building new one...', '#f00');
+
+            game.player.x = canvas.width / 2;
+            game.player.y = game.world.earthY;
+            game.player.vx = 0;
+            game.player.vy = 0;
+            game.player.fuel = game.player.maxFuel;
+            game.player.hull = game.player.maxHull;
+            game.player.cargo = 0;
+            game.player.atEarth = true;
+
+            // Penalty: lose some money
+            game.player.money = Math.floor(game.player.money * 0.7);
+        }
+
+        // Update UI elements
+        function updateUI() {
+            const p = game.player;
+
+            document.getElementById('money').textContent = '$' + p.money;
+            document.getElementById('altitude').textContent = Math.floor(Math.max(0, (game.world.earthY - p.y) / 10)) + ' km';
+            document.getElementById('fuel').textContent = Math.floor((p.fuel / p.maxFuel) * 100) + '%';
+            document.getElementById('hull').textContent = Math.floor((p.hull / p.maxHull) * 100) + '%';
+            document.getElementById('cargo').textContent = Math.floor(p.cargo) + '/' + p.maxCargo;
+            document.getElementById('galaxy').textContent = game.world.currentGalaxy;
+
+            document.getElementById('fuelBar').style.width = ((p.fuel / p.maxFuel) * 100) + '%';
+            document.getElementById('hullBar').style.width = ((p.hull / p.maxHull) * 100) + '%';
+            document.getElementById('cargoBar').style.width = ((p.cargo / p.maxCargo) * 100) + '%';
+
+            // Warning for low fuel
+            if (p.fuel < 20 && !p.atEarth) {
+                document.getElementById('fuel').classList.add('warning');
+            } else {
+                document.getElementById('fuel').classList.remove('warning');
+            }
+        }
+
+        // Render game
+        function render() {
+            // Clear canvas
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw stars
+            ctx.fillStyle = '#fff';
+            for (let i = 0; i < 100; i++) {
+                const x = (i * 137.5) % canvas.width;
+                const y = ((i * 234.7 + game.world.scroll * 0.1) % canvas.height);
+                ctx.fillRect(x, y, 2, 2);
+            }
+
+            ctx.save();
+            ctx.translate(0, game.world.scroll);
+
+            // Draw wormholes
+            for (const wormhole of game.wormholes) {
+                ctx.save();
+                ctx.translate(wormhole.x, wormhole.y);
+
+                // Animated wormhole effect
+                const time = Date.now() * 0.001;
+                for (let i = 5; i > 0; i--) {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, wormhole.size * (i / 5) + Math.sin(time * 2 + i) * 5, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(${128 + i * 20}, ${0 + i * 50}, ${255}, ${0.3})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // Draw fuel depots
+            for (const depot of game.fuelDepots) {
+                ctx.fillStyle = '#ff0';
+                ctx.strokeStyle = '#fa0';
+                ctx.lineWidth = 2;
+
+                // Draw satellite
+                ctx.fillRect(depot.x - 15, depot.y - 5, 30, 10);
+                ctx.strokeRect(depot.x - 15, depot.y - 5, 30, 10);
+
+                // Solar panels
+                ctx.fillStyle = '#08f';
+                ctx.fillRect(depot.x - 25, depot.y - 3, 8, 6);
+                ctx.fillRect(depot.x + 17, depot.y - 3, 8, 6);
+
+                // Antenna
+                ctx.strokeStyle = '#ff0';
+                ctx.beginPath();
+                ctx.moveTo(depot.x, depot.y - 5);
+                ctx.lineTo(depot.x, depot.y - 20);
+                ctx.stroke();
+            }
+
+            // Draw planets
+            for (const planet of game.planets) {
+                const gradient = ctx.createRadialGradient(planet.x, planet.y, planet.size * 0.3, planet.x, planet.y, planet.size);
+                gradient.addColorStop(0, `hsl(${planet.hue}, 70%, 60%)`);
+                gradient.addColorStop(1, `hsl(${planet.hue}, 70%, 20%)`);
+
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(planet.x, planet.y, planet.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Health bar for planets being mined
+                if (planet.health < planet.maxHealth) {
+                    ctx.fillStyle = '#f00';
+                    ctx.fillRect(planet.x - planet.size, planet.y - planet.size - 10, planet.size * 2, 5);
+                    ctx.fillStyle = '#0f0';
+                    ctx.fillRect(planet.x - planet.size, planet.y - planet.size - 10,
+                                 planet.size * 2 * (planet.health / planet.maxHealth), 5);
+                }
+
+                // Highlight if scanner active
+                if (game.research.scanner && planet.value > 200) {
+                    ctx.strokeStyle = '#ff0';
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(planet.x, planet.y, planet.size + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw asteroids
+            for (const ast of game.asteroids) {
+                ctx.save();
+                ctx.translate(ast.x, ast.y);
+                ctx.rotate(ast.rotation);
+
+                // Asteroid color based on type
+                ctx.fillStyle = ast.type === 'rare' ? '#8844ff' : '#888';
+                ctx.strokeStyle = ast.type === 'rare' ? '#aa66ff' : '#666';
+                ctx.lineWidth = 2;
+
+                // Draw irregular asteroid shape
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = ast.size * (0.8 + Math.random() * 0.4);
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+
+                // Health bar for asteroids being mined
+                if (ast.health < ast.maxHealth) {
+                    ctx.fillStyle = '#f00';
+                    ctx.fillRect(ast.x - ast.size, ast.y - ast.size - 8, ast.size * 2, 4);
+                    ctx.fillStyle = '#0f0';
+                    ctx.fillRect(ast.x - ast.size, ast.y - ast.size - 8,
+                                 ast.size * 2 * (ast.health / ast.maxHealth), 4);
+                }
+
+                // Highlight if scanner active
+                if (game.research.scanner && ast.type === 'rare') {
+                    ctx.strokeStyle = '#f0f';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(ast.x, ast.y, ast.size + 5, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
+
+            // Draw Earth
+            const earthGradient = ctx.createRadialGradient(
+                canvas.width / 2, game.world.earthY, 20,
+                canvas.width / 2, game.world.earthY, 50
+            );
+            earthGradient.addColorStop(0, '#4488ff');
+            earthGradient.addColorStop(0.7, '#2255aa');
+            earthGradient.addColorStop(1, '#001133');
+
+            ctx.fillStyle = earthGradient;
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, game.world.earthY, 50, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Earth details
+            ctx.fillStyle = '#2a4';
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 - 15, game.world.earthY - 10, 15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2 + 20, game.world.earthY + 15, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Landing pad
+            ctx.strokeStyle = '#0f0';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2 - 60, game.world.earthY + 50);
+            ctx.lineTo(canvas.width / 2 + 60, game.world.earthY + 50);
+            ctx.stroke();
+
+            // Draw player rocket
+            const p = game.player;
+            ctx.save();
+            ctx.translate(p.x, p.y);
+
+            // Rotate based on velocity
+            const angle = Math.atan2(p.vx, -p.vy);
+            ctx.rotate(angle);
+
+            // Rocket body
+            ctx.fillStyle = '#ccc';
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, -p.height / 2);
+            ctx.lineTo(-p.width / 2, p.height / 2);
+            ctx.lineTo(p.width / 2, p.height / 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Rocket details
+            ctx.fillStyle = '#f00';
+            ctx.fillRect(-p.width / 4, 0, p.width / 2, p.height / 3);
+
+            // Window
+            ctx.fillStyle = '#4af';
+            ctx.beginPath();
+            ctx.arc(0, -p.height / 4, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Thrust flame
+            if ((game.keys['w'] || game.keys['a'] || game.keys['d']) && p.fuel > 0) {
+                ctx.fillStyle = `rgba(255, ${100 + Math.random() * 155}, 0, 0.8)`;
+                ctx.beginPath();
+                ctx.moveTo(-p.width / 2, p.height / 2);
+                ctx.lineTo(0, p.height / 2 + 15 + Math.random() * 10);
+                ctx.lineTo(p.width / 2, p.height / 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Mining laser
+            if (p.mining) {
+                ctx.strokeStyle = `rgba(0, 255, 0, ${0.5 + Math.random() * 0.5})`;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, p.height / 2);
+                ctx.lineTo(0, p.height / 2 + game.settings.miningRange);
+                ctx.stroke();
+
+                // Laser glow
+                ctx.strokeStyle = `rgba(0, 255, 0, 0.2)`;
+                ctx.lineWidth = 8;
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        // Main game loop
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
